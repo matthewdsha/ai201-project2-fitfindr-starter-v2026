@@ -59,24 +59,24 @@
 
 ### `search_listings`
 
-- **What it does:**
-- **Inputs:** <!-- name and type each: `max_price` (float), not "a price" -->
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Finds listings matching a description, size, and max price.
+- **Inputs:** `description` (str), `size` (str or None), `max_price` (float or None)
+- **Returns:** A list of matching listing dicts (each with `id`, `title`, `description`, `category`, `style_tags`, `size`, `condition`, `price`, `colors`, `brand`, `platform`), ranked by keyword overlap with `description` — zero-overlap items are dropped, best match first. Size match is whole-token and case-insensitive ("M" matches "S/M" but not "US 9" or "XL") — not a substring test.
+- **When it has nothing:** Empty list (`[]`) — never `None`, never an exception.
 
 ### `suggest_outfit`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Suggests an outfit pairing a new item with the user's wardrobe.
+- **Inputs:** `new_item` (dict), `wardrobe` (dict with an `items` list)
+- **Returns:** A non-empty string with outfit suggestions.
+- **When it has nothing:** Empty wardrobe (`wardrobe['items'] == []`) → general styling advice instead, still a non-empty string — never raises, never `""`.
 
 ### `create_fit_card`
 
-- **What it does:**
-- **Inputs:**
-- **Returns:**
-- **When it has nothing:**
+- **What it does:** Writes a short caption for the item and outfit, mentioning the item, its price, and its platform once each.
+- **Inputs:** `outfit` (str), `new_item` (dict)
+- **Returns:** A 2-4 sentence caption string.
+- **When it has nothing:** Empty or whitespace-only `outfit` → a descriptive message saying no fit card could be made, instead of raising.
 
 ---
 
@@ -93,13 +93,13 @@
      The grader checks your code against what you claim here, so the file and
      function have to be real. -->
 
-**Branch rule:**
+**Branch rule:** If `search_listings` returns an empty list, put a message in `session["error"]` — saying what the user could change, not just "no results" — and stop, without calling `suggest_outfit` or `create_fit_card`. Otherwise, take the first result as `session["selected_item"]` and go to `suggest_outfit`.
 
 **Where it lives:** `agent.py::run_agent`
 
-**How the query is parsed:** <!-- regex, string splitting, or asking the model — say which -->
+**How the query is parsed:** Regex — one pattern pulls `max_price` out of "under $N", another pulls `size` out of "size X"; whatever's left after removing both becomes `description`.
 
-**What moves through the session:** <!-- which fields, in what order -->
+**What moves through the session:** `query` → `parsed` (description/size/max_price) → `search_results` → `selected_item` → `outfit_suggestion` → `fit_card`. `error` is set only if the branch stops early, in which case the later fields stay `None`.
 
 ---
 
