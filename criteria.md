@@ -21,82 +21,72 @@ data earns credit; *"80% seemed reasonable"* does not.
 
 ## 1. A matching query completes all three tools
 
-Given a query that matches at least one listing, the agent completes all three
-tool calls and returns a fit card — in at least 4 of 5 tries.
+Given 5 different queries, each one matching at least one listing, the agent
+finishes with `session["error"]` still `None` and `session["fit_card"]` a
+non-empty string — in at least 4 of the 5 queries.
 
 **Why this target:**
-<!-- Why 4 of 5 and not 5 of 5? Something about your search, probably —
-     "my search is a plain keyword match and some phrasings will miss" is a
-     real answer. -->
+`search_listings` matches on keywords, not meaning, so a real match can get
+missed just from wording (e.g. "tee" vs. a listing titled "t-shirt"). That's
+a limit of the search, not the loop, so I expect to miss sometimes — just
+not more than once in five.
 
 ---
 
 ## 2. An impossible query stops before the second tool
 
-Given a query that matches no listings, the agent stops before calling
-`suggest_outfit` and returns a message naming what to change — 5 of 5 tries.
+Given 5 different queries, each matching no listings, the agent stops before
+calling `suggest_outfit`, and the message in `session["error"]` names every
+filter the query actually set (the price ceiling, the size — both, if both
+were given) or, if neither was set, contains the word "keywords" — in 5 of 5.
 
 **Why this target:**
-<!-- Why is 5 of 5 reasonable here when criterion 1 isn't? What's different
-     about this path? -->
+This is just checking whether a list is empty — no model call, no scoring,
+nothing left to chance. If it ever fails, that's a bug, not bad luck.
 
 ---
 
 ## 3. Something about state
 
-<!-- YOU WRITE THIS ONE.
-
-     How would you know that the item your search found is the same item the
-     next tool received? Name something countable or observable.
-
-     This is the criterion people find hardest, because state failure doesn't
-     look like state failure — it looks like a tool problem. Something that
-     compares session["selected_item"] against what actually reached
-     suggest_outfit is the shape you're after. -->
-
-
+Given 5 different matching queries, wrap `suggest_outfit` to record the `id`
+of the `new_item` it's actually called with. That recorded `id` matches
+`session["selected_item"]["id"]` from the same run — in 5 of 5.
 
 **Why this target:**
-
-
+This is just code passing a value along — no model, no matching, nothing
+random about it. If the `id` ever changes, that's a bug in the loop, not
+bad luck.
 
 ---
 
 ## 4. Something about the fit card
 
-<!-- YOU WRITE THIS ONE.
-
-     The fit card calls a model, so the same input can produce different words
-     each time. That's not a bug — it's the nature of the tool. So what would
-     make it acceptable?
-
-     Think about what you'd actually be unhappy to see. A caption that never
-     mentions the price? Two different items producing the same opening
-     sentence? A card longer than a caption anyone would post? Any of those can
-     be turned into a number. -->
-
-
+Given the same item and outfit, run `create_fit_card` 5 times. Call a run a
+pass only if its opening sentence (everything up to the first `.`, `!`, or
+`?`) matches no other run's, and the card contains both a dollar sign
+followed by the listing's exact `price` value (e.g. "$24.99", not "twenty-
+five dollars") and its platform name, case-insensitive. At least 4 of 5 runs
+pass.
 
 **Why this target:**
-
-
+At `TEMPERATURE = 0.9` the cards shouldn't repeat themselves — if they do,
+that's `CACHE_ENABLED` or the temperature, not the model. But remembering to
+mention both the price and the platform every time means the model has to
+follow instructions perfectly, and it won't always, so I leave room for one
+miss.
 
 ---
 
 ## 5. Your choice
 
-<!-- YOU WRITE THIS ONE TOO.
-
-     Pick something you actually care about getting right. Speed, the empty
-     wardrobe path, what happens when the model can't be reached, whether the
-     search respects a price ceiling — anything, as long as it names a number
-     or an observable outcome. -->
-
-
+Given 5 different (query, `max_price`) pairs, every item `search_listings`
+returns in each run costs `max_price` or less, with zero violations across
+all 5 runs.
 
 **Why this target:**
-
-
+This is just a number comparison, done before any scoring happens. There's
+no reason it should ever let a too-expensive item through, so I'm not giving
+it any slack.
 
 ---
 
