@@ -13,10 +13,61 @@ Build and test your three tools in `tools.py` first. Then come here.
     python agent.py          runs both example paths below
 """
 
+import re
+
 import config
 import trace
 from tools import search_listings, suggest_outfit, create_fit_card
 from generate import ModelUnavailable
+
+
+# ── query parsing ─────────────────────────────────────────────────────────────
+
+def _parse_query(query: str) -> dict:
+    """
+    Pull a price ceiling and a size out of free-text query, regex-style.
+
+    "under $N" → max_price, "size X" → size. Whatever's left, with those two
+    phrases removed, becomes the description.
+    """
+    remaining = query
+    max_price = None
+    size = None
+
+    price_match = re.search(r"under\s*\$(\d+(?:\.\d+)?)", remaining, re.IGNORECASE)
+    if price_match:
+        max_price = float(price_match.group(1))
+        remaining = remaining[: price_match.start()] + remaining[price_match.end() :]
+
+    size_match = re.search(r"\bsize\s+([A-Za-z0-9/.]+)", remaining, re.IGNORECASE)
+    if size_match:
+        size = size_match.group(1)
+        remaining = remaining[: size_match.start()] + remaining[size_match.end() :]
+
+    description = re.sub(r"\s+", " ", remaining).strip()
+    return {"description": description, "size": size, "max_price": max_price}
+
+
+def _no_match_message(parsed: dict) -> str:
+    """
+    A message naming what the user could change — not just "no results".
+
+    Names each filter that was actually set (price ceiling, size); if neither
+    was set, points at the keywords instead.
+    """
+    constraints = []
+    if parsed["max_price"] is not None:
+        constraints.append(f"the ${parsed['max_price']:g} price ceiling")
+    if parsed["size"] is not None:
+        constraints.append(f"the size filter ({parsed['size']})")
+
+    if constraints:
+        return (
+            f'No listings matched "{parsed["description"]}" with '
+            + " and ".join(constraints)
+            + ". Try raising the price, loosening the size, or changing the keywords."
+        )
+    return f'No listings matched "{parsed["description"]}". Try different keywords.'
 
 
 # ── session state ─────────────────────────────────────────────────────────────
@@ -106,9 +157,38 @@ def run_agent(query: str, wardrobe: dict) -> dict:
         than a stack trace. The import is already at the top of this file.
     """
     session = new_session(query, wardrobe)
+    iteration = 0
 
-    # TODO: delete these two lines and build the loop.
-    session["error"] = "The planning loop isn't built yet — see the TODO in agent.py."
+    iteration += 1
+    trace.check_iterations(iteration)
+    session["parsed"] = _parse_query(query)
+
+    iteration += 1
+    trace.check_iterations(iteration)
+    session["search_results"] = search_listings(
+        session["parsed"]["description"],
+        session["parsed"]["size"],
+        session["parsed"]["max_price"],
+    )
+
+    if not session["search_results"]:
+        session["error"] = _no_match_message(session["parsed"])
+        return session
+
+    session["selected_item"] = session["search_results"][0]
+
+    iteration += 1
+    trace.check_iterations(iteration)
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"], session["wardrobe"]
+    )
+
+    iteration += 1
+    trace.check_iterations(iteration)
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"], session["selected_item"]
+    )
+
     return session
 
 
