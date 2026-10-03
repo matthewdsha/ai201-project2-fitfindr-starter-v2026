@@ -39,8 +39,7 @@
 
 ## What This Does
 
-<!-- Three or four sentences: what a user asks for, and what they get back. -->
-
+A user types a plain-language query — "vintage graphic tee under $30" — along with their wardrobe. FitFindr searches thrift listings for a match, asks the model for an outfit pairing the item with pieces the user already owns, and writes a short social caption mentioning the item's price and platform. If nothing matches the query, it stops early and says what to change instead of forcing an outfit and caption onto nothing.
 
 
 ---
@@ -112,9 +111,20 @@
 
 **One full query**
 
-The planning loop (`agent.py::run_agent`) isn't built yet — that's the next
-milestone. This section gets filled in once `python app.py ask '...'` runs
-the whole loop instead of hitting the TODO stub.
+```
+$ python app.py ask 'vintage graphic tee under $30'
+  Found:    Y2K Baby Tee — Butterfly Print — $18.0 on depop
+
+  Outfit:   **Outfit 1 (Casual Y2K):**
+Pair the Y2K butterfly baby tee with your baggy straight-leg dark wash jeans, layered under the black cropped zip hoodie. Finish with chunky white sneakers and the black crossbody bag.
+
+**Outfit 2 (Contrast Mix):**
+Pair the baby tee tucked into your wide-leg khaki trousers, cinched with the brown leather belt, and top it with the vintage black denim jacket. Complete the look with your black combat boots.
+
+  Fit card: Found this absolute gem of a butterfly tee while digging through the racks this weekend. Giving major 2000s mallrat energy, and honestly, I might keep it for myself if nobody snags it. Grab it on my depop for just $18 before I change my mind!
+
+0 model calls this session, 2 served from cache
+```
 
 **The three tools, tested one at a time**
 
@@ -157,15 +167,32 @@ Nothing beats the hunt for the ultimate vintage 501s, especially when they actua
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I asked Claude to attack the five acceptance criteria
+  in `criteria.md` — could someone check each one without asking me what I
+  meant.
+- *What came back:* It found that several "N of 5 tries" targets never said
+  what varies between the five tries. For criterion 1, running the *same*
+  query five times against a deterministic keyword search gives 5/5 or 0/5,
+  never 4/5 — the 4/5 target only makes sense across five *different*
+  matching queries. The fit-card criterion also bundled two separate checks
+  (no-repeat openings, mentions price/platform) under one rate with neither
+  defined precisely enough to code into a test.
+- *What I changed:* Rewrote all five criteria to name exactly what varies
+  across the five tries, and made "opening sentence" and "mentions
+  price/platform" concrete enough to check (text up to the first `.`/`!`/`?`;
+  a literal `$`+exact price substring and a case-insensitive platform match).
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* After pasting the three tool tests into the README's
+  Sample Run section, I asked Claude to confirm the output was good and
+  already pasted in.
+- *What came back:* It flagged itself that the `search_listings` output had
+  been abbreviated with `...` for readability, which conflicts with the
+  README's own instruction that only a full typed block of output earns
+  credit — a picture or summary of the output does not.
+- *What I changed:* Had it replace the abbreviated list with the complete,
+  unabbreviated output before committing.
 
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
