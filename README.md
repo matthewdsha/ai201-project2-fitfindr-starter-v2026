@@ -214,18 +214,51 @@ Nothing beats the hunt for the ultimate vintage 501s, especially when they actua
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Item in session matches item passed on | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card: distinct opening, price and platform | 4 of 5 | PASS | FAIL | PASS | FAIL | PASS | MISSED (3/5) |
+| 5. Nothing returned over max_price | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Real output from one try**, pasted as text, naming the file and function
-that produced it:
+How the tries were run: caching off, temperature 0.9. For criteria 1, 2, 3 and 5 the criterion asks for five *different* queries, so Try N is query N (all in `scenarios.py`). Criterion 3 is scored on the same five runs as criterion 1, with `suggest_outfit` wrapped to record the id it received. For criterion 4, Try N is fit card N for one item and one outfit (Y2K Baby Tee, same outfit text). Scoring is done by `score_criteria.py::main`; the full output is `results/scored_2026-10-11_1814_before.md`. Criterion 4 counts a price as present when a `$` amount equals the listing price numerically ("$18" for 18.0 counts; "18 bucks" does not).
 
+**Real output from one try per criterion**, from `score_criteria.py` calling `agent.py::run_agent` and `tools.py::create_fit_card`:
+
+Criterion 1, query `oversized flannel shirt` (`agent.py::run_agent`, fit_card):
+```
+error: None
+fit_card: 'Scored this oversized red plaid for just $22 on thredUp and honestly, it’s about to become my whole personality. Total 90s grunge energy open over a ribbed tank, or layered under a cropped hoodie when it gets chilly. Can’t beat a good flannel find.'
 ```
 
+Criterion 2, query `quantum spaceship helmet` (`agent.py::run_agent`, session["error"]; no filters set, so it must say "keywords"):
 ```
+parsed: {'description': 'quantum spaceship helmet', 'size': None, 'max_price': None}
+suggest_outfit called: False
+error: No listings matched "quantum spaceship helmet". Try different keywords.
+```
+
+Criterion 3, query `vintage graphic tee under $30` (`agent.py::run_agent`, suggest_outfit wrapped):
+```
+selected_item id: lst_002; id passed to suggest_outfit: ['lst_002']
+```
+
+Criterion 4, try 4, a FAIL (`tools.py::create_fit_card`; the opening sentence is the same as try 2's, and the price is written "18 bucks" with no `$`):
+```
+Found this little butterfly tee and I'm obsessed with the print. It’s giving major early 2000s energy and looks so good with baggy denim or contrasted with some edgy black boots. Up on Depop now for 18 bucks if you need it!
+```
+Try 2, the other FAIL (same opening sentence as try 4, "Found this little butterfly tee and I'm obsessed with the print."):
+```
+Found this little butterfly tee and I'm obsessed with the print. Already picturing it with baggy denim and a zip hoodie. Snagged it for $18 over on depop before someone else could!
+```
+
+Criterion 5, query `vintage jacket under $30`, max_price 30 (`tools.py::search_listings`):
+```
+10 results, prices [18.0, 22.0, 24.0, 20.0, 30.0, 12.0, 26.0, 24.0, 16.0, 29.0]
+over budget: []
+```
+Note: two of the five criterion-5 queries (`jeans under $25`, `sweatshirt under $15`) returned zero results. That is correct (the matching jeans cost $30 to $38 and the only matching sweatshirt costs $20), so the price filter is working, but those two passes mean "nothing over budget" rather than "checked several prices".
+
+Also noticed: `vintage graphic tee under $30` selects the Y2K Baby Tee (lst_002), not the item titled "Graphic Tee — 2003 Tour Bootleg Style" (lst_006, size L). The keyword search ranks it first, which is what criterion 1's own "Why this target" predicted.
 
 ---
 
