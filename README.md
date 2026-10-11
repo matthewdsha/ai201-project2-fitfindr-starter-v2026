@@ -282,6 +282,36 @@ Also noticed: `vintage graphic tee under $30` selects the Y2K Baby Tee (lst_002)
 
 | # | Criterion | Target | Verdict | How I decided |
 |---|---|---|---|---|
+| 1 | A matching query completes all three tools | 4 of 5 | **MET** (5/5) | All five queries ended with `session["error"]` None and a non-empty `fit_card`. |
+| 2 | An impossible query stops before the second tool | 5 of 5 | **MET** (5/5) | `suggest_outfit` was never called in any of the five, and each message named every filter set (or said "keywords" when none was). |
+| 3 | Item in session matches item passed on | 5 of 5 | **MET** (5/5) | The id recorded by the wrapped `suggest_outfit` equalled `session["selected_item"]["id"]` in all five runs. |
+| 4 | Fit card: distinct opening, price and platform | 4 of 5 | **MISSED** (3/5) | Tries 1, 3, 5 passed. Tries 2 and 4 share the opening sentence "Found this little butterfly tee and I'm obsessed with the print." and so both fail; try 4 also has no `$` price. |
+| 5 | Nothing returned over max_price | 5 of 5 | **MET** (5/5) | No result in any of the five runs cost more than its `max_price`. Two of the five returned no results at all (see below). |
+
+**Diagnoses**
+
+**Criterion 4 (the only miss): the model's output, steered by the prompt in `tools.py::create_fit_card`.** The tool ran every time and the loop and session were fine. Two separate things went wrong, both on the same step:
+
+- *Repeated opening (tries 2 and 4).* All five calls get an identical prompt (same item, same outfit text), and temperature is 0.9, so wording varies but the opening doesn't vary enough. "Found this … butterfly tee" is the natural first sentence for a casual caption about one specific item, and nothing in the prompt asks for variety. The sampling randomness isn't the cause, since the cache was off and the five cards were all different overall. The prompt gives the model no reason to open differently.
+- *Price not written as a dollar amount (try 4).* The prompt says "Mention the price and the platform once each" and shows `Price: $18.0`, but doesn't say to write it with a `$`. The model wrote "18 bucks", which is a fair reading of the prompt and a miss against the criterion.
+
+Both fixes would live in the same place, the prompt, so this is one problem, not two. The other four criteria passed because they test code (a branch, a pass-through, a number comparison) rather than model wording. The model-dependent criterion is the one that missed.
+
+**Pattern:** the misses are all model output, none are tool, branch or session bugs.
+
+**On the criterion's wording (not revised):** criterion 4 says "a dollar sign followed by the listing's exact `price` value (e.g. $24.99)". My listing's price is stored as `18.0`, so the literal string "$18.0" never appeared in any card; I counted a numerically equal `$18` as a pass. A strict reading would fail all five tries on price. That doesn't change the verdict (MISSED either way) and I'm not changing the criterion, because I'm not lowering a target; I'm noting that the price format was ambiguous and I read it generously.
+
+**Arguing the opposite verdict for each one** (my own cross-examination, trying to flip each call):
+
+- *Criterion 1, MET → could it be MISSED?* The strongest case: "completes all three tools" is checked only as "no error and a non-empty string", so a run can pass while returning the wrong thing. It did: `vintage graphic tee under $30` selected the Y2K Baby Tee, not the item titled "Graphic Tee — 2003 Tour Bootleg Style". And I picked five queries I knew would match. That is a fair criticism of the criterion's strength, but the criterion as written is about completion, and all five completed. **Verdict stands: MET.** The target (4 of 5) was probably easy for these five queries; the keyword-match problem it was meant to leave room for didn't show up in my set.
+- *Criterion 2, MET → MISSED?* Weak case. The checks (wrapper never called, message names every filter or "keywords") held for all five, including the size-only and price-only variants. **Verdict stands.**
+- *Criterion 3, MET → MISSED?* There's no way to argue a failure, but there is an argument that the pass means little: the loop sets `selected_item` once and passes that same variable on, so almost nothing can make the ids differ. **Verdict stands: MET**, but this is the criterion I'd tighten. Next time I'd check the item the model's outfit text actually mentions, not just the id that was passed.
+- *Criterion 4, MISSED → could it be MET?* The strongest case: tries 2 and 4 only "fail" because they match *each other*, so it could be read as one duplicate rather than two failures, which would give 4 of 5. But the criterion says a run passes only if its opening matches *no other* run's, so both fail. And try 4 independently fails on price. **Verdict stands: MISSED (3/5).**
+- *Criterion 5, MET → MISSED?* Two of the five queries (`jeans under $25`, `sweatshirt under $15`) returned zero results, so those passes are empty, not confirmed. The criterion is "zero violations across all 5 runs", which holds, but only three runs actually exercised the filter. **Verdict stands: MET**, and the zero-result cases are still a real test that the filter excludes things (matching items exist at $30 and above).
+
+**Targets:** I missed one criterion, so my targets weren't all too low. The one I'd tighten is criterion 3 (see above); criterion 1's target of 4 of 5 is generous for a set of queries I knew would match.
+
+---|---|---|---|---|
 | 1 |  |  |  |  |
 | 2 |  |  |  |  |
 | 3 |  |  |  |  |
