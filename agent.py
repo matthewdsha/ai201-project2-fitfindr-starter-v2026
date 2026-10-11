@@ -45,7 +45,7 @@ def _parse_query(query: str) -> dict:
         size = size_match.group(1)
         remaining = remaining[: size_match.start()] + remaining[size_match.end() :]
 
-    description = re.sub(r"\s+", " ", remaining).strip()
+    description = re.sub(r"\s+", " ", remaining).strip(" ,;.")
     return {"description": description, "size": size, "max_price": max_price}
 
 
@@ -96,6 +96,7 @@ def new_session(query: str, wardrobe: dict) -> dict:
         "outfit_suggestion": None,   # what suggest_outfit returned
         "fit_card": None,            # what create_fit_card returned
         "error": None,               # set when the run ended early
+        "notice": None,              # a note for the user on a run that still finished
     }
 
 
@@ -163,14 +164,22 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     iteration += 1
     trace.check_iterations(iteration)
     session["parsed"] = _parse_query(query)
+    trace.step("parse query", inputs=query, returned=str(session["parsed"]))
 
     iteration += 1
     trace.check_iterations(iteration)
-    session["search_results"] = call_tool("search_listings", {
+    search_args = {
         "description": session["parsed"]["description"],
         "size": session["parsed"]["size"],
         "max_price": session["parsed"]["max_price"],
-    })
+    }
+    session["search_results"] = call_tool("search_listings", search_args)
+    trace.step(
+        "search_listings (via MCP)",
+        inputs=str(search_args),
+        returned=session["search_results"],
+        note="" if session["search_results"] else "branch: empty, stopping",
+    )
 
     if not session["search_results"]:
         session["error"] = _no_match_message(session["parsed"])
@@ -178,17 +187,46 @@ def run_agent(query: str, wardrobe: dict) -> dict:
 
     session["selected_item"] = session["search_results"][0]
 
-    iteration += 1
-    trace.check_iterations(iteration)
-    session["outfit_suggestion"] = suggest_outfit(
-        session["selected_item"], session["wardrobe"]
-    )
+    if not session["wardrobe"].get("items"):
+        session["notice"] = (
+            "Your wardrobe is empty, so these are general styling ideas. "
+            "Add some pieces you own to get outfits built around them."
+        )
 
-    iteration += 1
-    trace.check_iterations(iteration)
-    session["fit_card"] = create_fit_card(
-        session["outfit_suggestion"], session["selected_item"]
-    )
+    try:
+        iteration += 1
+        trace.check_iterations(iteration)
+        session["outfit_suggestion"] = suggest_outfit(
+            session["selected_item"], session["wardrobe"]
+        )
+        trace.step(
+            "suggest_outfit",
+            inputs=(
+                f"{session['selected_item']['title']}, "
+                f"{len(session['wardrobe'].get('items', []))} wardrobe items"
+            ),
+            returned=session["outfit_suggestion"],
+        )
+
+        iteration += 1
+        trace.check_iterations(iteration)
+        session["fit_card"] = create_fit_card(
+            session["outfit_suggestion"], session["selected_item"]
+        )
+        trace.step(
+            "create_fit_card",
+            inputs=f"outfit text + {session['selected_item']['title']}",
+            returned=session["fit_card"],
+        )
+    except ModelUnavailable as exc:
+        trace.step("model unavailable", returned=str(exc), note="stopping")
+        item = session["selected_item"]
+        session["error"] = (
+            f"I found \"{item['title']}\" (${item['price']:g} on {item['platform']}), "
+            "but the styling service isn't responding right now, so I couldn't write "
+            "the outfit or fit card. Please try again in a few minutes. If it keeps "
+            "happening, the app's access key may need renewing by whoever runs it."
+        )
 
     return session
 

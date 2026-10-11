@@ -273,24 +273,44 @@ that produced it:
      the same length, your branch isn't working — and this is the fastest way
      anyone will ever find that out. -->
 
-**Happy path**
+**Happy path** (`python app.py ask 'vintage graphic tee under $30, size M' --trace`)
 
 ```
-
+[1] parse query
+      in:  vintage graphic tee under $30, size M
+      out: {'description': 'vintage graphic tee', 'size': 'M', 'max_price': 30.0}
+[2] search_listings (via MCP)
+      in:  {'description': 'vintage graphic tee', 'size': 'M', 'max_price': 30.0}
+      out: 8 items: Y2K Baby Tee — Butterfly Print, Mesh Long-Sleeve Top — Black, 90s Silk Slip Dress — Floral, Midi Length … +5 more
+[3] suggest_outfit
+      in:  Y2K Baby Tee — Butterfly Print, 10 wardrobe items
+      out: **Outfit 1 (Casual Y2K):** Pair the Y2K butterfly baby tee with your baggy straight-leg dark wash jeans, layer…
+[4] create_fit_card
+      in:  outfit text + Y2K Baby Tee — Butterfly Print
+      out: Found this absolute gem of a butterfly tee while digging through the racks this weekend. Giving major 2000s ma…
 ```
 
-**Empty search**
+**Empty search** (stops at step 2 — shorter, as it should be)
 
 ```
-
+[1] parse query
+      in:  purple tuxedo with sequins under $5, size XXS
+      out: {'description': 'purple tuxedo with sequins', 'size': 'XXS', 'max_price': 5.0}
+[2] search_listings (via MCP)
+      in:  {'description': 'purple tuxedo with sequins', 'size': 'XXS', 'max_price': 5.0}
+      out: [] (empty)
+      →    branch: empty, stopping
 ```
 
-**On the MCP move:** <!-- what changed in your code, and whether anything
-behaved differently afterwards. If the rewire didn't work, say exactly where it
-broke — the error text and the last thing that worked. That earns the point in
-full. -->
+**On the MCP move:** `search_listings` now runs on an MCP server (`mcp_server.py`) and `run_agent()` calls it with `mcp_client.call_tool`; step 2 of the trace is labelled "via MCP". Nothing behaved differently: the MCP result equals the direct call's (6 results for "graphic tee", max_price 30, and `[]` for a no-match query).
 
+**Failure modes triggered**
 
+| Failure | How I triggered it | What the agent said |
+|---|---|---|
+| Empty search | `python app.py ask 'purple tuxedo with sequins under $5, size XXS'` | "No listings matched "purple tuxedo with sequins" with the $5 price ceiling and the size filter (XXS). Try raising the price, loosening the size, or changing the keywords." Stopped without calling the model. |
+| Empty wardrobe | `python app.py ask 'vintage graphic tee under $30' --empty-wardrobe` | No crash, but it was silent about why the advice was generic. Now prints: "Your wardrobe is empty, so these are general styling ideas. Add some pieces you own to get outfits built around them." followed by the advice and fit card. |
+| Model unavailable | Ran with `GEMINI_API_KEY=bad` set in the environment (`.env` untouched) and a new query | **Before:** a bare `ModelUnavailable: The model rejected your API key…` line. **After (handler in `run_agent`):** "I found "Knit Cardigan — Chunky Brown" ($35 on depop), but the styling service isn't responding right now, so I couldn't write the outfit or fit card. Please try again in a few minutes. If it keeps happening, the app's access key may need renewing by whoever runs it." The technical error stays in the trace. |
 
 ---
 
