@@ -194,6 +194,18 @@ Nothing beats the hunt for the ultimate vintage 501s, especially when they actua
 - *What I changed:* Had it replace the abbreviated list with the complete,
   unabbreviated output before committing.
 
+**Moment 3 (unit 4)**
+
+- *What I asked for:* I pasted my three failure messages into Claude and asked what a user who can't see the code would try next.
+- *What came back:* The empty-search message was fine, but the bad-key message talked about `GEMINI_API_KEY` and `.env`, which means nothing to a user, and it didn't say the search had worked. The empty-wardrobe case had no message at all.
+- *What I changed:* Rewrote the bad-key message in plain language (it now names the item that was found), and added a note that tells the user when advice is generic because their wardrobe is empty.
+
+**Moment 4 (unit 4)**
+
+- *What I asked for:* I had Claude argue the opposite verdict for each criterion.
+- *What came back:* The verdicts all held, but it showed criterion 3 can barely fail (the loop passes one variable along) and that two of criterion 5's five queries returned no results, so those passes were empty.
+- *What I changed:* Nothing in the code. I wrote both weaknesses into the README rather than treating those passes as strong evidence.
+
 <!-- ═══════════════════════ UNIT 4 — THE TEST ═══════════════════════
 
      Don't fill these in during unit 3.
@@ -428,11 +440,11 @@ How much to trust it: this is one run of five cards, so it shows the change work
 
 ## What's Still Broken
 
-<!-- For each criterion still missed: what you'd do, and why you stopped where
-     you did. "I ran out of time" is fine if it's true. Pretending nothing is
-     left is not. -->
+No criterion is still missed: all five are MET in the after run (criterion 4 went from 3/5 to 5/5 after the prompt change). That isn't the same as nothing being left:
 
-
+- **Criterion 4 is the shakiest pass.** It's one run of five cards, and the model isn't forced to vary its openings, so a rerun could miss again. The cards also still share phrasing after the first sentence. If I kept going I'd generate the captions from different "angles" (e.g. a mood or an outfit detail per call) instead of only asking for variety, and rerun it several times to get a real rate. I stopped because the one-change rule means the prompt edit was the single change for this unit.
+- **Search relevance.** `vintage graphic tee under $30` selects the Y2K Baby Tee, not the item titled "Graphic Tee — 2003 Tour Bootleg Style". Keyword overlap ranks it first, and criterion 1 only checks that a run completes, so it still passes. I'd weight title matches over description matches. I didn't, because no criterion I wrote measures it.
+- **Two of my criteria are weak tests.** Criterion 3 can barely fail, and two of criterion 5's five queries returned no results. I'd tighten criterion 3 to check the item the outfit text actually mentions, and pick five criterion-5 queries that all return results. I left them as written because the original lines shouldn't be edited just to make them harder after the fact.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
