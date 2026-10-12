@@ -384,26 +384,45 @@ Both fixes would live in the same place, the prompt, so this is one problem, not
 
      `python run_eval.py --label after` -->
 
-**What I changed:**
+**What I changed:** one edit to the prompt in `tools.py::create_fit_card`, nothing else. I added two instructions to the end of the prompt: write the price with a dollar sign ("like $18", never in words), and don't open by announcing the find ("no 'Found this…' or 'Just found…'"); open with a reaction, a detail, or a moment specific to the piece.
 
-**Which failure it was meant to fix:**
+**Which failure it was meant to fix:** criterion 4's two failure mechanisms, which both lived in that prompt: tries 2 and 4 opened with the same sentence ("Found this little butterfly tee and I'm obsessed with the print."), and try 4 wrote "18 bucks" instead of a dollar amount. The diagnosis said the prompt gave the model no reason to open differently and never asked for a `$`, so the change adds exactly those two things.
 
-### Run Log — After
+### Run Log — Before and After, side by side
+
+Same scorer (`score_criteria.py`), same scenarios, same five queries, caching off, temperature 0.9. Before: `results/scored_2026-10-11_1814_before.md`. After: `results/scored_2026-10-11_2042_after.md`.
+
+| Criterion | Target | Before (Try 1–5) | Before verdict | After (Try 1–5) | After verdict |
+|---|---|---|---|---|---|
+| 1. A matching query completes all three tools | 4 of 5 | PASS PASS PASS PASS PASS | MET (5/5) | PASS PASS PASS PASS PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS PASS PASS PASS PASS | MET (5/5) | PASS PASS PASS PASS PASS | MET (5/5) |
+| 3. Item in session matches item passed on | 5 of 5 | PASS PASS PASS PASS PASS | MET (5/5) | PASS PASS PASS PASS PASS | MET (5/5) |
+| 4. Fit card: distinct opening, price and platform | 4 of 5 | PASS FAIL PASS FAIL PASS | MISSED (3/5) | PASS PASS PASS PASS PASS | MET (5/5) |
+| 5. Nothing returned over max_price | 5 of 5 | PASS PASS PASS PASS PASS | MET (5/5) | PASS PASS PASS PASS PASS | MET (5/5) |
+
+The same table in the README's usual one-column-per-try format, for the after run:
 
 | Criterion | Target | Try 1 | Try 2 | Try 3 | Try 4 | Try 5 | Verdict |
 |---|---|---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |  |  |
+| 1. A matching query completes all three tools | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 2. An impossible query stops before the second tool | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 3. Item in session matches item passed on | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 4. Fit card: distinct opening, price and platform | 4 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
+| 5. Nothing returned over max_price | 5 of 5 | PASS | PASS | PASS | PASS | PASS | MET (5/5) |
 
-**Did it help, and how do I know:**
+Real output from the after run (`tools.py::create_fit_card`, five cards for the same item and outfit; the openings are the first sentence of each):
 
-<!-- If it made things worse, say that. Honestly reported, that earns full
-     credit and is more interesting than one that worked. -->
+```
+1. Mariah would definitely approve of this butterfly print. I’ve been living in tiny baby tees lately, and this one is the ultimate throwback. Grab it on my Depop for $18 before I change my mind and keep it for myself.
+2. Major butterfly clip and low-rise jeans energy right here. Seriously cannot get over this print, ... Grabbed it on Depop for $18 and honestly, it’s about to be my whole personality all spring.
+3. Main character energy right here. Just snagged this little butterfly tee and I'm already imagining it with baggy denim ... Grab it on Depop for $18 before I change my mind and keep it for myself.
+4. Nostalgia is hitting so hard with this little butterfly print. Tossed it on with baggy denim ... Grabbed it on Depop for $18 and I'm officially living my 2000s pop star dream.
+5. Can we talk about this butterfly print? It’s giving peak early 2000s mall run, ... Grabbed it on Depop for $18 and I'm obsessed.
+```
 
+**Did it help, and how do I know:** yes, on the criterion it targeted. Criterion 4 went from MISSED (3/5) to MET (5/5): all five openings are different, and every card has a `$18` price and "Depop". Before, two cards shared an opening and one had "18 bucks". The other four criteria are unchanged at 5/5, which is expected because none of them involve the fit-card prompt (criterion 1 only checks that a fit card exists).
 
+How much to trust it: this is one run of five cards, so it shows the change works in this sample, not that it will pass every time. The model still isn't forced to vary, so a repeat could miss again. The cards also still share phrasing past the first sentence, e.g. "Grab it on Depop for $18 before I change my mind and keep it for myself" appears in cards 1 and 3. That doesn't affect criterion 4 (which only compares opening sentences), but it suggests the variety is shallow. I changed only the prompt and nothing else, so the improvement isn't confounded with another change. The `$18` vs `$18.0` ambiguity noted under Verdicts still applies: no card writes "$18.0", and I count `$18` as a pass.
 
 ---
 

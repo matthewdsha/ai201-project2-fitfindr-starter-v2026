@@ -243,9 +243,12 @@ def create_fit_card(outfit: str, new_item: dict) -> str:
         f"Price: ${new_item['price']}\n"
         f"Platform: {new_item['platform']}\n"
         f"Outfit idea: {outfit}\n\n"
-        "Mention the price and the platform once each. Make it sound like a "
+        "Mention the price and the platform once each, and write the price "
+        "with a dollar sign (like $18), never in words. Make it sound like a "
         "real post from the person who found it, specific about the vibe — "
-        "not a product description."
+        "not a product description. Don't open by announcing the find "
+        "(no \"Found this...\" or \"Just found...\"); open with a reaction, a "
+        "detail, or a moment specific to this piece."
     )
 
     return generate(
